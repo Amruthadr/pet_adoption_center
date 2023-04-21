@@ -1,7 +1,6 @@
 import json
 import random
 import datetime
-import time
 from typing import List, Dict
 
 from pymongo import MongoClient
@@ -11,7 +10,6 @@ db = client["pet_adoption"]  # Replace "your_database_name" with the desired nam
 
 
 def clear_database():
-    db.address.drop()
     db.owner.drop()
     db.dog.drop()
     db.adoption.drop()
@@ -19,8 +17,7 @@ def clear_database():
 
 
 def get_breed_documents(dog_breeds: List[Dict]):
-    breed_documents = []
-
+    breeds = []
     for dog_breed in dog_breeds:
         breed_document = {
             "name": dog_breed["Name"],
@@ -31,44 +28,24 @@ def get_breed_documents(dog_breeds: List[Dict]):
             "more_about": dog_breed["MoreAbout"],
             "images_urls": dog_breed["ImagesUrls"],
         }
-        breed_documents.append(breed_document)
-    return breed_documents
+        breeds.append(breed_document)
+    return breeds
 
 
-def insert_addresses(owners: List[Dict]):
-    collection = db["address"]
-    documents = []
-
-    for owner in owners:
-        document = {
-            "address": owner["Address"]["Address"],
-            "city": owner["Address"]["City"],
-            "country": owner["Address"]["Country"],
-            "zip": owner["Address"]["Zip"]
-        }
-        documents.append(document)
-
-    result = collection.insert_many(documents)
-    print(f"Inserted {len(result.inserted_ids)} rows to address collection.")
-    return result
-
-
-def insert_owners(owners: List[Dict], address_ids: List):
+def insert_owners(owners):
     collection = db["owner"]
-    documents = []
+    batch_size = 25000
 
-    for idx, owner in enumerate(owners):
-        document = {
-            "full_name": owner["Name"],
-            "email_id": owner["Email"],
-            "mobile": owner["Mobile"],
-            "address_id": address_ids[idx]
-        }
-        documents.append(document)
+    owner_id_results = []
 
-    result = collection.insert_many(documents)
-    print(f"Inserted {len(result.inserted_ids)} rows to owner collection.")
-    return result
+    for i in range(0, len(owners), batch_size):
+        batch = owners[i:i + batch_size]
+        result = collection.insert_many(batch)
+        owner_id_results += result.inserted_ids
+        print(f"Inserted {len(result.inserted_ids)} rows to owner collection (Batch {i // batch_size + 1}).")
+
+    print(f"Inserted {len(owner_id_results)} rows to owner collection in total.")
+    return owner_id_results
 
 
 def random_past_date(past_years: int = 5) -> datetime.datetime:
@@ -133,8 +110,41 @@ def get_random_names() -> List[str]:
         return json.load(file)
 
 
+def generate_dummy_owners(names: list, addresses: list, cities: list, countries: list, num_owners: int):
+    dummy_owners = []
+
+    for _ in range(num_owners):
+        first_name = random.choice(names)
+        last_name = random.choice(names)
+        name = f"{first_name} {last_name}"
+        email = f"{first_name.lower()}.{last_name.lower()}@puppyworld.in"
+        mobile = ''.join([str(random.randint(0, 9)) for _ in range(10)])
+
+        address = random.choice(addresses)
+        shuffled_address = ' '.join(random.sample(address.split(), len(address.split())))
+
+        city = random.choice(cities)
+        country = random.choice(countries)
+        zip_code = ''.join([str(random.randint(0, 9)) for _ in range(5)])
+
+        owner = {
+            "name": name,
+            "email": email,
+            "mobile": mobile,
+            "address": {
+                "street": shuffled_address,
+                "city": city,
+                "country": country,
+                "zip": zip_code
+            }
+        }
+        dummy_owners.append(owner)
+
+    return dummy_owners
+
+
 def insert_dog(dog_names_collections: List[str], breed_info_collections: List[object],
-               address_id_collections: List[str],
+               countries_collections: List[str],
                max_entry: int = 1000):
     collection = db["dog"]
     dog_documents = []
@@ -144,7 +154,7 @@ def insert_dog(dog_names_collections: List[str], breed_info_collections: List[ob
         dog = {
             "breed": random.choice(breed_info_collections),
             "name": random.choice(dog_names_collections),
-            "address_id": random.choice(address_id_collections)
+            "country": random.choice(countries_collections)
         }
         dog_documents.append(dog)
         num_entries += 1
@@ -179,15 +189,18 @@ if __name__ == "__main__":
     breed_documents = get_breed_documents(dog_breed_data)
 
     owner_data = get_owner_data()
-    address_insertion_result = insert_addresses(owner_data)
-    address_ids = address_insertion_result.inserted_ids
-    owner_insertion_result = insert_owners(owner_data, address_ids)
-
-    random_names = get_random_names()
+    unique_names = get_random_names()
+    unique_countries = list(set([owner["Address"]["Country"] for owner in owner_data]))
+    unique_cities = list(set([owner["Address"]["City"] for owner in owner_data]))
+    unique_addresses = list(set([owner["Address"]["Address"] for owner in owner_data]))
     max_entries = 250000
-    dog_inserted_ids = insert_dog(random_names, breed_documents, address_ids, max_entry=max_entries)
 
-    adoption_insertion_result = insert_adoption(owner_insertion_result.inserted_ids, dog_inserted_ids,
+    unique_owners = generate_dummy_owners(unique_names, unique_addresses, unique_cities, unique_countries, max_entries)
+    owner_ids = insert_owners(unique_owners)
+
+    dog_inserted_ids = insert_dog(unique_names, breed_documents, unique_countries, max_entry=max_entries)
+
+    adoption_insertion_result = insert_adoption(owner_ids, dog_inserted_ids,
                                                 ignore_frequency=10)
     print("Data loading successful.")
     print_db_size()
