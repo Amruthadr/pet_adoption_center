@@ -49,9 +49,10 @@ if __name__ == "__main__":
         print("Choose an option:")
         print("1. Find top 5 dogs of a specific breed")
         print("2. Find top 5 dogs adopted by a specific owner")
-        print("3. Add a new owner")
-        print("4. Delete owner")
-        print("5. Exit")
+        print("3. Update Dog name by id")
+        print("4. Add a new owner")
+        print("5. Delete owner")
+        print("Any other key. Exit")
 
         choice = int(input("Enter your choice (1-5): "))
 
@@ -100,5 +101,5 @@ if __name__ == "__main__":
             owner_id = input("Enter the owner ID: ")
             deleted_count = delete_owner(owner_id)
             print(f"Deleted {deleted_count} owner.")
-    else:
-        print("Invalid choice. Please try again.")
+        else:
+            print("Invalid choice. Please try again.")
