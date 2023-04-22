@@ -34,7 +34,7 @@ def get_breed_documents(dog_breeds: List[Dict]):
 
 def insert_owners(owners):
     collection = db["owner"]
-    batch_size = 25000
+    batch_size = 10000
 
     owner_id_results = []
 
@@ -76,7 +76,7 @@ def insert_adoption(owner_ids_collection: List[object], dog_ids_collection: List
         }
         adoption_list.append(adoption_record)
 
-        if len(adoption_list) % 25000 == 0:
+        if len(adoption_list) % 10000 == 0:
             result = collection.insert_many(adoption_list)
             print(f"Inserted {len(result.inserted_ids)} rows to adoption collection.")
             adoption_id_results += result.inserted_ids
@@ -158,7 +158,7 @@ def insert_dog(dog_names_collections: List[str], breed_info_collections: List[ob
         }
         dog_documents.append(dog)
         num_entries += 1
-        if num_entries % 50000 == 0:
+        if num_entries % 10000 == 0:
             result = collection.insert_many(dog_documents)
             print(f"Inserted {len(result.inserted_ids)} rows to dog collection.")
             dog_id_results += result.inserted_ids
@@ -193,7 +193,7 @@ if __name__ == "__main__":
     unique_countries = list(set([owner["Address"]["Country"] for owner in owner_data]))
     unique_cities = list(set([owner["Address"]["City"] for owner in owner_data]))
     unique_addresses = list(set([owner["Address"]["Address"] for owner in owner_data]))
-    max_entries = 250000
+    max_entries = 100000
 
     unique_owners = generate_dummy_owners(unique_names, unique_addresses, unique_cities, unique_countries, max_entries)
     owner_ids = insert_owners(unique_owners)
